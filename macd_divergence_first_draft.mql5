@@ -102,7 +102,7 @@ void checkDivergenceBuy(){
          double tp = Ask + 0.0005;
          double sl = Ask - 0.0008;
          
-         if((prevMacdLow < currentMacdLow) && (prevPricePoint > currentPricePoint) && tradeTaken == false){
+         if((prevMacdLow < currentMacdLow) && (prevPricePoint > currentPricePoint) && tradeTaken == false  && (currentPriceTime - prevPriceTime) > 4000){
             //trade.Buy(lot, NULL, Ask, NULL, NULL, NULL);
             trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;   
@@ -110,35 +110,34 @@ void checkDivergenceBuy(){
             drawLine(lineName, prevPriceTime, prevPricePoint, currentPriceTime, currentPricePoint);
             drawLine(lineName+"sW", prevPriceTime, prevMacdLow, currentPriceTime, currentMacdLow, 1);
             
-            Comment(prevMacdLow,"\n",currentMacdLow,"\n\n",prevPricePoint,"\n",currentPricePoint);
-         }else if((prevMacdLow > currentMacdLow) && (prevPricePoint < currentPricePoint) && tradeTaken == false){
+         }else if((prevMacdLow > currentMacdLow) && (prevPricePoint < currentPricePoint) && tradeTaken == false && (currentPriceTime - prevPriceTime) > 4000){
             trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;
             string lineName = "Trend Line" + tradeCounter;
             drawLine(lineName, prevPriceTime, prevPricePoint, currentPriceTime, currentPricePoint);
             drawLine(lineName+"sW", prevPriceTime, prevMacdLow, currentPriceTime, currentMacdLow, 1);
-            Comment("condiition 2");
-         }else if((lastThirdMacdLow < currentMacdLow) && (lastThirdPricePoint > currentPricePoint) && tradeTaken == false){
+            Comment(currentPriceTime -prevPriceTime);
+         }else if((lastThirdMacdLow < currentMacdLow) && (lastThirdPricePoint > currentPricePoint) && tradeTaken == false && (currentPriceTime - lastThirdPriceTime) > 4000){
             trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;
             string lineName = "Trend Line" + tradeCounter;
             drawLine(lineName, lastThirdPriceTime, lastThirdPricePoint, currentPriceTime, currentPricePoint);
-            drawLine(lineName+"sW", prevPriceTime, lastThirdMacdLow, currentPriceTime, currentMacdLow, 1);
-            Comment("condiition 3");
-         }else if((lastThirdMacdLow > currentMacdLow) && (lastThirdPricePoint < currentPricePoint) && tradeTaken == false){
+            drawLine(lineName+"sW", lastThirdPriceTime, lastThirdMacdLow, currentPriceTime, currentMacdLow, 1);
+            Comment(currentPriceTime - lastThirdPriceTime);
+         }else if((lastThirdMacdLow > currentMacdLow) && (lastThirdPricePoint < currentPricePoint) && tradeTaken == false && (currentPriceTime - lastThirdPriceTime) > 4000){
             trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;
             string lineName = "Trend Line" + tradeCounter;
             drawLine(lineName, lastThirdPriceTime, lastThirdPricePoint, currentPriceTime, currentPricePoint);
-            drawLine(lineName+"sW", prevPriceTime, lastThirdMacdLow, currentPriceTime, currentMacdLow, 1);
-            Comment("condiition 4");
-         }else if((lastMacdLow < currentMacdLow) && (lastPricePoint > currentPricePoint) && tradeTaken == false){
+            drawLine(lineName+"sW", lastThirdPriceTime, lastThirdMacdLow, currentPriceTime, currentMacdLow, 1);
+            Comment(currentPriceTime - lastThirdPriceTime);
+         }else if((lastMacdLow < currentMacdLow) && (lastPricePoint > currentPricePoint) && tradeTaken == false && (currentPriceTime - lastPriceTime) > 4000){
             /** trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;
             string lineName = "Trend Line" + tradeCounter;
             drawLine(lineName, lastPriceTime, lastPricePoint, currentPriceTime, currentPricePoint);
             Comment("condiition 5"); **/
-         }else if((lastMacdLow > currentMacdLow) && (lastPricePoint < currentPricePoint) && tradeTaken == false){
+         }else if((lastMacdLow > currentMacdLow) && (lastPricePoint < currentPricePoint) && tradeTaken == false && (currentPriceTime - lastPriceTime) > 4000){
             /** trade.Buy(lot, NULL, Ask, sl, tp, NULL);
             tradeTaken = true;
             string lineName = "Trend Line" + tradeCounter;
@@ -153,5 +152,5 @@ void checkDivergenceBuy(){
 
 void drawLine(string name, double time1, double price1, double time2, double price2, int window = 0){
    ObjectCreate(_Symbol, name, OBJ_TREND, window , time1, price1, time2, price2);
-   ObjectSetInteger(window, name, OBJPROP_COLOR, clrLightCoral);
+   ObjectSetInteger(window, name, OBJPROP_COLOR, clrAntiqueWhite);
 }
