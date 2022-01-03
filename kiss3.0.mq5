@@ -32,9 +32,10 @@ CTrade trade;
 //EURUSD_OLD
 
 datetime globalbartime;
-input double ls = 0.01;
+input double ls = 0.02;
+input bool dynamicLot = true;
 input int thisEAMagicNumber = 1111000;
-input int interval = 39;
+input int interval = 48;
 input int lotlimit = 100;
 int numofmultiples_buy = 0;
 double newLot_buy = 0;
@@ -52,8 +53,8 @@ double thrd_highestlot_buy = 0;
 double sec_highestlot_buy = 0;
 double highestlot_buy = 0;
 
-int BBands = iBands(_Symbol,PERIOD_CURRENT,20,0,2,PRICE_CLOSE);
-int stoch = iStochastic(_Symbol,PERIOD_CURRENT,5,3,3,MODE_SMA,STO_LOWHIGH);
+int BBands = iBands(_Symbol,PERIOD_M15,20,0,2,PRICE_CLOSE);
+int stoch = iStochastic(_Symbol,PERIOD_M15,5,3,3,MODE_SMA,STO_LOWHIGH);
 int rsiWindow = iRSI(_Symbol,PERIOD_M15,7,PRICE_CLOSE);
 
 //run this function each time the price changes on the chart.
@@ -72,9 +73,13 @@ void onBar_buy(){
    //get the bid and ask price
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    double Bid = NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits);
-   int takeProfit = 40; // 4 pips in pippettes
-   double lot = ls; 
-   
+   int takeProfit = 150; // 15 pips in pippettes
+   double lot;
+   if(dynamicLot == true){
+      lot = NormalizeDouble((AccountInfoDouble(ACCOUNT_BALANCE)*0.02)/500,2);
+   }else{
+      lot = ls;
+   }
    //loops through all the open positions (buy and sell) to check the total number of position to a type of order
    int num = 0;
    for(int i = PositionsTotal()-1; i >= 0; i--){
@@ -87,7 +92,7 @@ void onBar_buy(){
    if(num == 0){
       numofmultiples_buy = 0;
       //open a buy position
-      kiss(ls);
+      kiss(lot);
       first_buy = Ask;
       thrd_highestlot_buy = 0;
       sec_highestlot_buy = 0;
@@ -207,6 +212,7 @@ void onBar_buy(){
 void uniformPointCalculator_buy(){
    double nextTPSL = 56.231777683731956 + 0.3434495*(MathAbs(highestlot_buy-thrd_highestlot_buy)*multiplier) + 0.03663685*(MathAbs(sec_highestlot_buy-thrd_highestlot_buy)*multiplier) + 0.30681265*(MathAbs(highestlot_buy-sec_highestlot_buy)*multiplier) + 0.01972324*(MathAbs(highestlot_buy-first_buy)*multiplier);  
    nextTPSL = highestlot_buy + nextTPSL*_Point;
+   nextTPSL = bestTp(nextTPSL);
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    
    //loop through all positions that are currently open
@@ -225,6 +231,48 @@ void uniformPointCalculator_buy(){
    }    
 }
 
+double bestTp(double currentTp){
+   double sum = 0; double newCalculatedTp = 0;
+   int u = 0;
+   double finalAmountAtClose = 0;
+   double allLots = 0; double subtract = 0;
+   double lastThreeLots = 0; double posOpen[3] = {0,0,0}; double posVolume[3] = {0,0,0};
+   for(int i = PositionsTotal()-1; i >= 0; i--){
+      string symbols = PositionGetSymbol(i);
+      if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
+         finalAmountAtClose += ((currentTp - PositionGetDouble(POSITION_PRICE_OPEN))*10000) * (PositionGetDouble(POSITION_VOLUME)*10);
+         allLots += PositionGetDouble(POSITION_VOLUME);
+         if(u < 3){
+            subtract = finalAmountAtClose;
+            posOpen[u] = PositionGetDouble(POSITION_PRICE_OPEN);
+            posVolume[u] = NormalizeDouble((PositionGetDouble(POSITION_VOLUME)*10),2);
+         }
+         if(u == 2){
+            lastThreeLots = allLots;
+            u++;
+         }else{
+            u++;
+         }
+      }
+   }
+   
+   if(finalAmountAtClose < 1){
+      int add = 10;
+      do{
+         sum = 0;
+         currentTp = NormalizeDouble((currentTp + (add)*_Point), 5);
+         for(int i=0; i<3; i++){
+            sum += ((currentTp - posOpen[i])*10000) * posVolume[i];
+         }
+         add += 10;
+      }while(sum < (-1* (finalAmountAtClose-subtract)) && !IsStopped());
+         
+      return currentTp;
+   }else{
+      return currentTp;
+   }
+}
+
 void kiss(double lSize){
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    double Bid = NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits);
@@ -234,12 +282,8 @@ void kiss(double lSize){
    sec = checkBollinger(BBands);
    third = checkRsi(rsiWindow);
    
-   if(PositionsTotal() == 0){
-      if( (third == 1) && (sec == 1) && (first == 1) ){
-         trade.Buy(lSize, NULL, Ask,  Ask-0.0010, Ask+0.0010, NULL);
-      }else if( (third == 2) && (sec == 2) && (first == 2) ){
-         //trade.Sell(lSize, NULL, Bid, Bid+0.0010, Bid-0.0010, NULL);
-      }
+   if( (third == 1) && (sec == 1) && (first == 1) ){
+      trade.Buy(lSize, NULL, Ask,  Ask-0.0010, Ask+0.0010, NULL);
    }
 }
 
@@ -288,13 +332,13 @@ int checkBollinger(int BBandsDef){
    CopyBuffer(BBandsDef,1,0,3,UBand);
    CopyBuffer(BBandsDef,2,0,3,LBand); 
    
-   if((priceInfo[0].low < LBand[0])||
-      (priceInfo[1].low < LBand[1]) ){
+   if((priceInfo[0].close < LBand[0])||
+      (priceInfo[1].close < LBand[1]) ){
      returnVal = 1;
    }
 
-   if((priceInfo[1].high > UBand[1])||
-      (priceInfo[0].high > UBand[0]) ){ 
+   if((priceInfo[1].close > UBand[1])||
+      (priceInfo[0].close > UBand[0]) ){ 
      returnVal = 2; 
    }
    return(returnVal); 
