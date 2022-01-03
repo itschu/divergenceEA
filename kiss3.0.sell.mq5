@@ -33,8 +33,9 @@ CTrade trade;
 
 datetime globalbartime;
 input double ls = 0.01;
+input bool dynamicLot = true;
 input int thisEAMagicNumber = 1111000;
-input int interval = 39;
+input int interval = 80;
 input int lotlimit = 100;
 int numofmultiples_sell = 0;
 double newLot_sell = 0;
@@ -75,7 +76,12 @@ void onBar_sell(){
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    double Bid = NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits);
    int takeProfit = 150; // 15 pips in pippettes
-   double lot = ls; 
+   double lot;
+   if(dynamicLot == true){
+      lot = NormalizeDouble((AccountInfoDouble(ACCOUNT_BALANCE)*0.02)/500,2);
+   }else{
+      lot = ls;
+   }
    
    //loops through all the open positions (buy and sell) to check the total number of position to a type of order
    int num = 0;
@@ -89,7 +95,7 @@ void onBar_sell(){
    if(num == 0){
       numofmultiples_sell = 0;
       //open a buy position
-      kiss(ls);
+      kiss(lot);
       first_sell = Bid;
       thrd_highestlot_sell = 0;
       sec_highestlot_sell = 0;
@@ -337,8 +343,8 @@ int checkBollinger(int BBandsDef){
      returnVal = 1;
    }
 
-   if((priceInfo[1].close > UBand[1])||
-      (priceInfo[0].close > UBand[0])){ 
+   if((priceInfo[1].close > UBand[1] && (priceInfo[1].close - priceInfo[1].open) > 0.0005)||
+      priceInfo[0].close > UBand[0] && (priceInfo[0].close - priceInfo[0].open) > 0.0005){ 
      returnVal = 2; 
    }
    return(returnVal); 
