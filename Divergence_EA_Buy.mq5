@@ -48,6 +48,7 @@ void OnTick(){
    trade.SetExpertMagicNumber(thisEAMagicNumber);   
    datetime rightbartime = iTime(_Symbol,PERIOD_CURRENT, 0);
    if(rightbartime != globalbartime){
+      lowpoint_search();
       checkDivergenceBuy();
       globalbartime = rightbartime;
    }
@@ -57,7 +58,6 @@ void checkDivergenceBuy(){
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    int takeProfit = 100;
    int num = 0;
-   double pricelow_array[5] = {0, 0, 0, 0, 0};
    for(int i = PositionsTotal()-1; i >= 0; i--){
       string sym = PositionGetSymbol(i);
       if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
@@ -74,7 +74,7 @@ void checkDivergenceBuy(){
             num_2 += 1;
          }   
       }
-      if((num_2 <= num_firstlot)&&((highestlot_buy - interval*_Point) >= Ask)){
+      if((num_2 <= num_firstlot) && ((highestlot_buy - interval*_Point) >= Ask)){
          //call the function and pass the following arguments into it
          trade.Buy(lot, NULL, Ask, NULL, firstTP, NULL);
          thrd_highestlot_buy = sec_highestlot_buy;
@@ -148,88 +148,97 @@ void checkDivergenceBuy(){
             }       
          }
       }
+      if ((macdlow[0] != 0) && (macdlow[1] != 0)){
+         lowarray_update();
+      }
    }else{
-      //sec_highestlot_buy = 0;
-      //highestlot_buy = 0;
-      if ((macdlow[0] == 0) && (macdlow[1] == 0)){
-         MqlRates PriceInfo[];
-         ArraySetAsSeries(PriceInfo, true);
-         CopyRates(_Symbol, PERIOD_CURRENT, 1, 5, PriceInfo);
-         pricelow_array[0] = PriceInfo[0].low; pricelow_array[1] = PriceInfo[1].low; pricelow_array[2] = PriceInfo[2].low;
-         pricelow_array[3] = PriceInfo[3].low; pricelow_array[4] = PriceInfo[4].low;
-      
-         double macdLineArray[];  
-         ArraySetAsSeries(macdLineArray, true);
-         CopyBuffer(macd,0,1,5, macdLineArray);
-         
-         //CopyBuffer(macd,1,1,3, macdLineArray);
-         macd_min = ArrayMinimum(macdLineArray, 0, WHOLE_ARRAY);
-         price_min = ArrayMinimum(pricelow_array, 0, WHOLE_ARRAY);
-         
-         if ((macdLineArray[2] == macdLineArray[macd_min]) && (macdLineArray[macd_min] < 0)){
-            macdlow[0] = macdLineArray[2];
-            pricelow[0] = pricelow_array[price_min];
-         }     
-      }else{
-         MqlRates PriceInfo[];
-         ArraySetAsSeries(PriceInfo, true);
-         CopyRates(_Symbol, PERIOD_CURRENT, 1, 5, PriceInfo);
-         pricelow_array[0] = PriceInfo[0].low; pricelow_array[1] = PriceInfo[1].low; pricelow_array[2] = PriceInfo[2].low;
-         pricelow_array[3] = PriceInfo[3].low; pricelow_array[4] = PriceInfo[4].low;
-      
-         double macdLineArray[];  
-         ArraySetAsSeries(macdLineArray, true);
-         CopyBuffer(macd,0,1,5, macdLineArray);
-         
-         macd_min = ArrayMinimum(macdLineArray, 0, WHOLE_ARRAY);
-         price_min = ArrayMinimum(pricelow_array, 0, WHOLE_ARRAY);
-         
-         if ((macdLineArray[2] == macdLineArray[macd_min]) && macdLineArray[macd_min] < 0){
-            macdlow[1] = macdLineArray[2];
-            pricelow[1] = pricelow_array[price_min];
+      if ((macdlow[0] != 0) && (macdlow[1] != 0)){
+         if ((pricelow[1] < pricelow[0]) && (macdlow[1] > macdlow[0])){
             numofmultiples_buy = 0;
-            if ((pricelow[1] < pricelow[0]) && (macdlow[1] > macdlow[0]) && (PriceInfo[price_min].low + slippage*_Point) > Ask){
-               lot = ls;
-               trade.Buy(lot, NULL, Ask, NULL, NULL, NULL);
+            lot = ls;
+            trade.Buy(lot, NULL, Ask, NULL, NULL, NULL);
                
-               macdlow[0] = 0;
-               macdlow[1] = 0;
-               pricelow[0] = 0;
-               pricelow[1] = 0;
+            lowarray_update();
                
-               first_buy = Ask;
-               thrd_highestlot_buy = 0;
-               sec_highestlot_buy = 0;
-               highestlot_buy = Ask;
+            first_buy = Ask;
+            thrd_highestlot_buy = 0;
+            sec_highestlot_buy = 0;
+            highestlot_buy = Ask;
                
-               //get the details such as opening price and position id from the first opened positions
-               double newTp = 0;
-               ulong newTicket = 0;
-               for(int i = 0; i <= PositionsTotal()-1; i++){ 
-                  string sym = PositionGetSymbol(i);
-                  if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
-                     newTicket = PositionGetInteger(POSITION_TICKET);
-                     break;
-                  }   
-               }
-               //add the take profit defined earlier to the opening price
-               newTp = highestlot_buy + takeProfit*_Point;
-               
-               //modiify the first opened positions take profit and stop loss
-               if (Ask > newTp){
-                  trade.PositionClose(newTicket);
-               }else{
-                  trade.PositionModify(newTicket, 0, newTp);
+            //get the details such as opening price and position id from the first opened positions
+            double newTp = 0;
+            ulong newTicket = 0;
+            for(int i = 0; i <= PositionsTotal()-1; i++){ 
+               string sym = PositionGetSymbol(i);
+               if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
+                  newTicket = PositionGetInteger(POSITION_TICKET);
+                  break;
                }   
-            }else{
-               macdlow[0] = macdlow[1];
-               macdlow[1] = 0;
-               pricelow[0] = pricelow[1];
-               pricelow[1] = 0;   
             }
+            //add the take profit defined earlier to the opening price
+            newTp = highestlot_buy + takeProfit*_Point;
+               
+            //modiify the first opened positions take profit and stop loss
+            if (Ask > newTp){
+               trade.PositionClose(newTicket);
+            }else{
+               trade.PositionModify(newTicket, 0, newTp);
+            }   
+         }else{
+            lowarray_update();   
          }
       }
    }
+}
+
+void lowpoint_search(){
+   double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
+   double pricelow_array[5] = {0, 0, 0, 0, 0};
+   if ((macdlow[0] == 0) && (macdlow[1] == 0)){
+      MqlRates PriceInfo[];
+      ArraySetAsSeries(PriceInfo, true);
+      CopyRates(_Symbol, PERIOD_CURRENT, 1, 5, PriceInfo);
+      pricelow_array[0] = PriceInfo[0].low; pricelow_array[1] = PriceInfo[1].low; pricelow_array[2] = PriceInfo[2].low;
+      pricelow_array[3] = PriceInfo[3].low; pricelow_array[4] = PriceInfo[4].low;
+      
+      double macdLineArray[];  
+      ArraySetAsSeries(macdLineArray, true);
+      CopyBuffer(macd,0,1,5, macdLineArray);
+         
+      //CopyBuffer(macd,1,1,3, macdLineArray);
+      macd_min = ArrayMinimum(macdLineArray, 0, WHOLE_ARRAY);
+      price_min = ArrayMinimum(pricelow_array, 0, WHOLE_ARRAY);
+         
+      if ((macdLineArray[2] == macdLineArray[macd_min]) && (macdLineArray[macd_min] < 0)){
+         macdlow[0] = macdLineArray[2];
+         pricelow[0] = pricelow_array[price_min];
+      }     
+   }else{
+      MqlRates PriceInfo[];
+      ArraySetAsSeries(PriceInfo, true);
+      CopyRates(_Symbol, PERIOD_CURRENT, 1, 5, PriceInfo);
+      pricelow_array[0] = PriceInfo[0].low; pricelow_array[1] = PriceInfo[1].low; pricelow_array[2] = PriceInfo[2].low;
+      pricelow_array[3] = PriceInfo[3].low; pricelow_array[4] = PriceInfo[4].low;
+      
+      double macdLineArray[];  
+      ArraySetAsSeries(macdLineArray, true);
+      CopyBuffer(macd,0,1,5, macdLineArray);
+         
+      macd_min = ArrayMinimum(macdLineArray, 0, WHOLE_ARRAY);
+      price_min = ArrayMinimum(pricelow_array, 0, WHOLE_ARRAY);
+         
+      if ((macdLineArray[2] == macdLineArray[macd_min]) && (macdLineArray[macd_min] < 0) && (PriceInfo[price_min].low + slippage*_Point) > Ask){
+         macdlow[1] = macdLineArray[2];
+         pricelow[1] = pricelow_array[price_min];
+      }
+   }
+}
+
+void lowarray_update(){
+   macdlow[0] = macdlow[1];
+   macdlow[1] = 0;
+   pricelow[0] = pricelow[1];
+   pricelow[1] = 0;
 }
 
 void uniformPointCalculator_buy(){
@@ -251,3 +260,4 @@ void uniformPointCalculator_buy(){
       }        
    }    
 }
+
