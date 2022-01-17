@@ -53,9 +53,10 @@ double thrd_highestlot_buy = 0;
 double sec_highestlot_buy = 0;
 double highestlot_buy = 0;
 
-int BBands = iBands(_Symbol,PERIOD_M15,20,0,2,PRICE_CLOSE);
-int stoch = iStochastic(_Symbol,PERIOD_M15,5,3,3,MODE_SMA,STO_LOWHIGH);
-int rsiWindow = iRSI(_Symbol,PERIOD_M15,7,PRICE_CLOSE);
+int BBands = iBands(_Symbol,PERIOD_CURRENT,20,0,2,PRICE_CLOSE);
+int stoch = iStochastic(_Symbol,PERIOD_CURRENT,5,3,3,MODE_SMA,STO_LOWHIGH);
+int rsiWindow = iRSI(_Symbol,PERIOD_CURRENT,7,PRICE_CLOSE);
+int macd = iMACD(_Symbol,PERIOD_CURRENT,12,26,9,PRICE_CLOSE);
 
 //run this function each time the price changes on the chart.
 void OnTick(){
@@ -73,10 +74,10 @@ void onBar_buy(){
    //get the bid and ask price
    double Ask=NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_ASK), _Digits);
    double Bid = NormalizeDouble(SymbolInfoDouble(_Symbol, SYMBOL_BID), _Digits);
-   int takeProfit = 150; // 15 pips in pippettes
+   int takeProfit = 100; // 5 pips in pippettes
    double lot;
    if(dynamicLot == true){
-      lot = NormalizeDouble((AccountInfoDouble(ACCOUNT_BALANCE)*0.02)/500,2);
+      lot = NormalizeDouble((AccountInfoDouble(ACCOUNT_BALANCE)*0.01)/5000,2);
    }else{
       lot = ls;
    }
@@ -232,45 +233,21 @@ void uniformPointCalculator_buy(){
 }
 
 double bestTp(double currentTp){
-   double sum = 0; double newCalculatedTp = 0;
-   int u = 0;
+   double sum = 0; double add = 0;
    double finalAmountAtClose = 0;
-   double allLots = 0; double subtract = 0;
-   double lastThreeLots = 0; double posOpen[3] = {0,0,0}; double posVolume[3] = {0,0,0};
-   for(int i = PositionsTotal()-1; i >= 0; i--){
-      string symbols = PositionGetSymbol(i);
-      if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
-         finalAmountAtClose += ((currentTp - PositionGetDouble(POSITION_PRICE_OPEN))*10000) * (PositionGetDouble(POSITION_VOLUME)*10);
-         allLots += PositionGetDouble(POSITION_VOLUME);
-         if(u < 3){
-            subtract = finalAmountAtClose;
-            posOpen[u] = PositionGetDouble(POSITION_PRICE_OPEN);
-            posVolume[u] = NormalizeDouble((PositionGetDouble(POSITION_VOLUME)*10),2);
-         }
-         if(u == 2){
-            lastThreeLots = allLots;
-            u++;
-         }else{
-            u++;
+   do{
+      sum = 0;
+      currentTp = NormalizeDouble((currentTp + (add)*_Point), 5);
+      for(int i = PositionsTotal()-1; i >= 0; i--){
+         string symbols = PositionGetSymbol(i);
+         if((PositionGetInteger(POSITION_TYPE) == ORDER_TYPE_BUY) && (PositionGetInteger(POSITION_MAGIC) == thisEAMagicNumber)){
+            finalAmountAtClose += ((currentTp - PositionGetDouble(POSITION_PRICE_OPEN))*10000) * (PositionGetDouble(POSITION_VOLUME)*10);
          }
       }
-   }
+      add += 50;
+   }while(finalAmountAtClose < 1 && !IsStopped());
    
-   if(finalAmountAtClose < 1){
-      int add = 10;
-      do{
-         sum = 0;
-         currentTp = NormalizeDouble((currentTp + (add)*_Point), 5);
-         for(int i=0; i<3; i++){
-            sum += ((currentTp - posOpen[i])*10000) * posVolume[i];
-         }
-         add += 10;
-      }while(sum < (-1* (finalAmountAtClose-subtract)) && !IsStopped());
-         
-      return currentTp;
-   }else{
-      return currentTp;
-   }
+   return currentTp;
 }
 
 void kiss(double lSize){
@@ -324,7 +301,7 @@ int checkStoch(int stochDef){
 
 int checkBollinger(int BBandsDef){
    MqlRates priceInfo[];
-   CopyRates(_Symbol, PERIOD_M15, 0, 3, priceInfo);
+   CopyRates(_Symbol, PERIOD_CURRENT, 0, 3, priceInfo);
    
    int returnVal = 0; double UBand[]; double LBand[];
    ArraySetAsSeries(priceInfo, true); ArraySetAsSeries(UBand, true); ArraySetAsSeries(LBand, true);
@@ -333,12 +310,12 @@ int checkBollinger(int BBandsDef){
    CopyBuffer(BBandsDef,2,0,3,LBand); 
    
    if((priceInfo[0].close < LBand[0])||
-      (priceInfo[1].close < LBand[1]) ){
+      (priceInfo[1].close < LBand[1])){
      returnVal = 1;
    }
 
    if((priceInfo[1].close > UBand[1])||
-      (priceInfo[0].close > UBand[0]) ){ 
+      (priceInfo[0].close > UBand[0])){ 
      returnVal = 2; 
    }
    return(returnVal); 
